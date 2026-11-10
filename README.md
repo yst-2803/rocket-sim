@@ -168,3 +168,4 @@ python rocket_sim.py
 | `openrocket_C6-7.csv` | OpenRocket export used for validation |
 | `validation_vs_openrocket.png` | Comparison plot |
 | `derivation_notes.pdf` | Handwritten derivations |
+| `excel_verification.xlsx` | Hand verification: impulse, mass model, coast estimate and Excel Euler |
