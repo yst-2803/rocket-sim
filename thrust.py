@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
 # Load the csv file
 
 data = np.loadtxt("Estes_C6.csv",delimiter=",",skiprows=5)
@@ -58,10 +59,24 @@ while t < 10:
     hs.append(y[0])
     vs.append(y[1])
 
-print("First time: ",t_data[0])
-print("Number of points: ",len(t_data))
-print("Total impulse: ",I_total)
-print("Apogee:", max(hs))
+def apogee(t,y):
+    if y[0] < 1.0:
+        return 1.0
+    return y[1]
+apogee.terminal = True
+apogee.direction = -1
+sol = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
+events=apogee, max_step=0.01)
+
+
+euler_apogee = max(hs)
+rk_apogee = sol.y_events[0][0][0]
+
+print("RK45 apogee:", rk_apogee)
+print("Euler apogee:",euler_apogee)
+print("RK45 time of apogee:", sol.t_events[0][0])
+print("Difference:", (euler_apogee - rk_apogee) / rk_apogee * 100, "%")
+
 
 #Plotting the data points
 
