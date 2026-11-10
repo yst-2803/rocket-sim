@@ -1,6 +1,6 @@
 # 1D Model Rocket Flight Simulator
 
-A 1D flight simulator for an Estes Alpha III model rocket on a C6-7 motor, built from first principles in Python. It models altitude, velocity and apogee, and is validated against OpenRocket to within 3.1%. This project was inspired by seeing a Storm Shadow in person at MBDA, which got me interested in how flight vehicles are simulated before they fly.
+A 1D flight simulator for an Estes Alpha III model rocket on a C6-7 motor, built from first principles in Python. It models altitude, velocity and apogee, and is validated against OpenRocket to within 3.1%. This project was inspired by my work experience at MBDA, which got me interested in how flight vehicles are simulated before they ever fly.
 
 ![Simulation vs OpenRocket](validation_vs_openrocket.png)
 
@@ -24,7 +24,7 @@ m\frac{dv}{dt} = \dot{m}_e v_e - mg - D
 
 so the thrust term is $T = \dot{m}_e v_e$.
 
-> ✏️ **YOUR WORDS (1–2 sentences):** why the equation uses $m\frac{dv}{dt}$ and not $\frac{d(mv)}{dt}$, i.e. the exhaust momentum is already inside the measured thrust.
+The momentum carried away by the exhaust is already included within the thrust term from the derivation, since thrust is $T = v_e\frac{dm_e}{dt}$, so using $\frac{d(mv)}{dt}$ would count it twice.
 
 **Mass model.** Assuming constant exhaust velocity, $v_e = I_{total}/m_{prop}$, which gives
 
@@ -32,11 +32,11 @@ so the thrust term is $T = \dot{m}_e v_e$.
 m(t) = m_0 - m_{prop}\,\frac{I(t)}{I_{total}}, \qquad I(t) = \int_0^t T\,dt'
 ```
 
-> ✏️ **YOUR WORDS (1 sentence):** what this means physically, i.e. mass is lost in proportion to impulse delivered, so fastest during the thrust spike.
+This means the mass at any time is the initial mass minus the propellant mass multiplied by the ratio of the impulse delivered so far to the total impulse.
 
 **Drag direction.** Drag is written as $v|v|$ rather than $v^2$.
 
-> ✏️ **YOUR WORDS (1 sentence):** why, i.e. $v^2$ loses the sign of $v$, while $v|v|$ always opposes motion.
+$v^2$ fixes the sign no matter what phase the rocket is in, as a square is always positive. Multiplying the velocity by its absolute value keeps its sign, so drag always opposes the motion whether the rocket is going up or coming down.
 
 **Check:** with $g = 0$ and no drag, the equation reduces to the Tsiolkovsky rocket equation,
 
@@ -44,7 +44,7 @@ m(t) = m_0 - m_{prop}\,\frac{I(t)}{I_{total}}, \qquad I(t) = \int_0^t T\,dt'
 \Delta v = v_e \ln\left(\frac{m_0}{m_f}\right)
 ```
 
-The full derivation is in my handwritten notes *(✏️ optional: link a PDF scan here)*.
+The full derivation is in my handwritten notes: [derivation_notes.pdf](derivation_notes.pdf).
 
 ---
 
@@ -83,7 +83,7 @@ Both solvers call the same derivative function, so any difference between them i
 - **Launch pad:** acceleration is held at zero while thrust < weight, so the rocket can't sink into the ground.
 - **Apogee** is detected with an event function that finds where $v$ crosses zero.
 
-> ✏️ **YOUR WORDS (1–2 sentences):** the lift-off trap, i.e. the event first fired at $t = 0$ because $v$ sits at exactly 0 on the pad, fixed by only arming it above 1 m.
+The apogee event (which watches for $v$ crossing zero) fired at $t = 0$, because the rocket sits at exactly $v = 0$ on the pad until thrust exceeds its weight, which the solver counted as a crossing. I fixed this by only arming the event once the rocket is above 1 m.
 
 ---
 
@@ -97,7 +97,7 @@ Both solvers call the same derivative function, so any difference between them i
 | Python Euler vs Excel Euler (same method, built independently) | 373.104 m vs 373.104 m |
 | Euler ($\Delta t = 0.01$ s) vs RK45 | 373.10 vs 373.45 m (−0.09%) |
 
-> ✏️ **YOUR WORDS (1–2 sentences):** what the Euler vs RK45 result means, i.e. numerical error is ~0.1%, so the gap to OpenRocket must come from the physics, not the solver.
+It tells us the time step used in Euler was small enough that the numerical error is negligible (about 0.1%). This means the gap to OpenRocket comes mainly from the physics assumptions (constant air density and a constant drag coefficient) rather than the solver.
 
 ---
 
@@ -122,17 +122,15 @@ Both solvers call the same derivative function, so any difference between them i
 | Max velocity | 116.2 m/s | 117 m/s | −0.7% |
 | Time to apogee | 7.94 s | 8.12 s | −2.2% |
 
-> ✏️ **YOUR WORDS (2–3 sentences):** where the gap comes from. Point to the plot: the curves match through the burn and only separate in the coast. Constant sea-level $\rho$ overestimates drag at altitude; re-running the coast formula with $\rho$ at 250 m closed the gap from 2.1% to 1.2%. Predicted *before* seeing the result.
+My simulation underestimates OpenRocket's apogee by about 3% because of two simplifications: air density is assumed constant at 1.225 kg/m³, when at apogee (~386 m) it is closer to 1.18 kg/m³, and the drag coefficient is assumed constant. Both make my model slightly over-predict drag in the coast. The plot supports this: the curves match almost exactly through the burn and only separate in the coast, and re-running the coast formula with the air density at 250 m reduced the gap from 2.1% to 1.2%.
 
 ---
 
 ## Key findings
 
-> ✏️ **YOUR WORDS, 2–4 bullets.** Suggestions:
-> - Fin geometry alone (square 3 mm → rounded 1.5 mm) changed $C_d$ from 1.08 to 0.56 and OpenRocket's apogee from 265 m to 379 m (+43%). $C_d$ is the least certain input.
-> - The prediction that Euler would overestimate apogee was wrong: it underestimated, because it applies drag at the start of each step (when speed is highest), over-decelerating the rocket.
-> - At this rocket's size, peak drag is ~6× its weight, so drag dominates the coast.
-> - Peak thrust-to-weight is ~25:1, which gets the rocket off the rod at ~20 m/s.
+- Changing the fins from square to rounded edges increased OpenRocket's apogee by 43%, showing how sensitive the drag coefficient ($C_d$ 1.08 → 0.56) is to fin geometry.
+- The peak thrust-to-weight ratio was about 25:1.
+- At top speed, drag was approximately 6 times the weight, due to its quadratic dependence on velocity.
 
 ---
 
@@ -143,8 +141,6 @@ Both solvers call the same derivative function, so any difference between them i
 - **1D only:** no wind, no weathercocking, no launch rod.
 - **Constant exhaust velocity** assumed in the mass model.
 - **No parachute:** after apogee the sim falls ballistically, so only the ascent is compared.
-
-> ✏️ **Optional:** add anything else you think matters.
 
 ---
 
@@ -162,12 +158,13 @@ Both solvers call the same derivative function, so any difference between them i
 
 ```bash
 pip install numpy scipy matplotlib
-python thrust.py
+python rocket_sim.py
 ```
 
-| File                           | Contents |
-|--------------------------------|---|
-| `rocket_sim.py`                | Simulation, solvers and plots |
-| `Estes_C6.csv`                 | Certified C6 thrust curve (thrustcurve.org) |
-| `openrocket_C6-7.csv`          | OpenRocket export used for validation |
+| File | Contents |
+|---|---|
+| `rocket_sim.py` | Simulation, solvers and plots |
+| `Estes_C6.csv` | Certified C6 thrust curve (thrustcurve.org) |
+| `openrocket_C6-7.csv` | OpenRocket export used for validation |
 | `validation_vs_openrocket.png` | Comparison plot |
+| `derivation_notes.pdf` | Handwritten derivations |
