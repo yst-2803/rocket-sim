@@ -1,6 +1,6 @@
 # 1D Model Rocket Flight Simulator
 
-A 1D flight simulator for an Estes Alpha III model rocket on a C6-7 motor, built from first principles in Python. It models altitude, velocity and apogee, and is validated against OpenRocket to within 3.1%. This project was inspired by my work experience at MBDA, which got me interested in how flight vehicles are simulated before they ever fly.
+A 1D flight simulator for an Estes Alpha III model rocket on a C6-7 motor, built from first principles in Python. It models altitude, velocity and apogee, and its predicted apogee agrees with OpenRocket to within 3.1%. That is a comparison between two simulations using the same drag coefficient, not a flight test. This project was inspired by my work experience at MBDA, which got me interested in how flight vehicles are simulated before they ever fly.
 
 ![Simulation vs OpenRocket](validation_vs_openrocket.png)
 
@@ -24,7 +24,7 @@ m\frac{dv}{dt} = \dot{m}_e v_e - mg - D
 
 so the thrust term is $T = \dot{m}_e v_e$.
 
-The momentum carried away by the exhaust is already included within the thrust term from the derivation, since thrust is $T = v_e\frac{dm_e}{dt}$, so using $\frac{d(mv)}{dt}$ would count it twice.
+$F = \frac{d(mv)}{dt}$ only holds for a system whose mass is constant, so it can't be applied to the rocket on its own: doing so adds an extra $v\,\dot{m}$ term whose size depends on the frame $v$ is measured in. The derivation therefore treats the rocket and its exhaust together as one closed system, and the thrust term $T = v_e\frac{dm_e}{dt}$ comes out of that momentum balance.
 
 **Mass model.** Assuming constant exhaust velocity, $v_e = I_{total}/m_{prop}$, which gives
 
@@ -59,7 +59,7 @@ The full derivation is in my handwritten notes: [derivation_notes.pdf](derivatio
 | Dry mass (after burnout) | 46.3 g | 34 g rocket + 12.3 g empty casing |
 | Body diameter | 25 mm ($A = 4.91 \times 10^{-4}$ m²) | Estes spec |
 | Drag coefficient $C_d$ | 0.56 | OpenRocket (rounded 1.5 mm fins) |
-| Air density $\rho$ | 1.225 kg/m³ | Sea level, held constant |
+| Air density $\rho$ | 1.225 kg/m³ | Sea level, held constant (an ISA run is included for comparison) |
 | Time step $\Delta t$ (Euler) | 0.01 s | — |
 
 Conditions: no wind, vertical launch, sea level.
@@ -92,22 +92,25 @@ The apogee event (which watches for $v$ crossing zero) fired at $t = 0$, because
 | Check | Result |
 |---|---|
 | Total impulse (trapezium rule) vs motor spec | 8.817 vs 8.8 Ns (0.2%) |
-| Exhaust velocity $I_{sp}$ from mass model vs spec | 81.7 vs ~83 s |
-| Mass at burnout vs expected dry mass | 46.3 g vs 46.3 g |
+| Specific impulse $I_{total}/(m_{prop}\,g)$ from mass model vs spec | 83.2 vs ~83 s |
+| Mass at burnout vs expected dry mass | 46.3 g vs 46.3 g (true by construction, so this only checks the mass integration) |
 | Python Euler vs Excel Euler (same method, built independently) | 373.104 m vs 373.104 m |
 | Euler ($\Delta t = 0.01$ s) vs RK45 | 373.10 vs 373.45 m (−0.09%) |
 
-It tells us the time step used in Euler was small enough that the numerical error is negligible (about 0.1%). This means the gap to OpenRocket comes mainly from the physics assumptions (constant air density and a constant drag coefficient) rather than the solver.
+It tells us the time step used in Euler was small enough that the numerical error is negligible (about 0.1%). This means the gap to OpenRocket comes from the model's inputs and physics assumptions rather than the solver.
 
 ---
 
-## Validation: am I solving the right equations?
+## Comparison with OpenRocket: am I solving the right equations?
+
+OpenRocket is another simulation, and my drag coefficient is taken from it, so this tests the equations of motion and the integration rather than the aerodynamics. Proper validation needs flight data.
 
 | Source | Apogee | vs OpenRocket |
 |---|---|---|
 | OpenRocket 24.12 | 385.5 m | — |
 | **This simulator (RK45)** | **373.4 m** | **−3.1%** |
 | This simulator (Euler) | 373.1 m | −3.2% |
+| This simulator (RK45, ISA air density) | 376.8 m | −2.3% |
 | Analytical coast solution* | 378 m | −2.1% |
 | Estes (manufacturer) | 351 m | −9.0% |
 
@@ -122,22 +125,29 @@ It tells us the time step used in Euler was small enough that the numerical erro
 | Max velocity | 116.2 m/s | 117 m/s | −0.7% |
 | Time to apogee | 7.94 s | 8.12 s | −2.2% |
 
-My simulation underestimates OpenRocket's apogee by about 3% because of two simplifications: air density is assumed constant at 1.225 kg/m³, when at apogee (~386 m) it is closer to 1.18 kg/m³, and the drag coefficient is assumed constant. Both make my model slightly over-predict drag in the coast. The plot supports this: the curves match almost exactly through the burn and only separate in the coast, and re-running the coast formula with the air density at 250 m reduced the gap from 2.1% to 1.2%.
+My simulation underestimates OpenRocket's apogee by 3.1%. I first put this down to constant air density and a constant drag coefficient in the coast. Breaking the gap down shows that is only part of it:
+
+- **Air density explains about a quarter.** Switching to ISA density (1.225 kg/m³ on the pad, about 1.18 kg/m³ at apogee) raises the apogee from 373.4 m to 376.8 m, which closes 0.9 of the 3.1 percentage points.
+- **The gap opens during the burn, not only in the coast.** At burnout my simulation is already 1.1 m/s slower and 0.8 m lower than OpenRocket, at heights where air density has barely changed. The altitude plot above hides this; the residual plot below shows it.
+- **Most of the rest is the drag coefficient.** Working backwards from OpenRocket's own trajectory (`openrocket_effective_cd.py`, assuming it used the same masses) gives an effective $C_d$ of about 0.52–0.55 through the flight, below the constant 0.56 I used. Re-running with $C_d = 0.53$ and ISA density gives 388.0 m (+0.7%). That value was picked after seeing the answer, so it shows where the gap comes from; it is not an independent prediction.
+
+![Residuals vs OpenRocket](residuals_vs_openrocket.png)
 
 ---
 
 ## Key findings
 
-- Changing the fins from square to rounded edges increased OpenRocket's apogee by 43%, showing how sensitive the drag coefficient ($C_d$ 1.08 → 0.56) is to fin geometry.
+- In OpenRocket, changing the fins from square to rounded edges increased its predicted apogee by 43% ($C_d$ 1.08 → 0.56), so the drag coefficient is the most uncertain input to this model.
+- My predicted apogee is sensitive to that input: changing $C_d$ by 0.03 moves it by about 11 m (3%), as much as the whole gap to OpenRocket.
 - The peak thrust-to-weight ratio was about 25:1.
-- At top speed, drag was approximately 6 times the weight, due to its quadratic dependence on velocity.
+- At top speed, drag was about 5 times the rocket's weight (2.27 N against 0.45 N), so the total deceleration just after burnout is about 6 g.
 
 ---
 
 ## Limitations
 
-- **Constant air density.** No altitude variation (OpenRocket uses the International Standard Atmosphere).
-- **Constant $C_d$**, taken from OpenRocket, so the comparison isn't fully independent: it validates the equations of motion and integration, not the aerodynamics.
+- **Constant air density** in the baseline run (OpenRocket uses the International Standard Atmosphere; the ISA run above shows the effect).
+- **Constant $C_d$**, taken from OpenRocket, so the comparison isn't fully independent: it tests the equations of motion and integration, not the aerodynamics.
 - **1D only:** no wind, no weathercocking, no launch rod.
 - **Constant exhaust velocity** assumed in the mass model.
 - **No parachute:** after apogee the sim falls ballistically, so only the ascent is compared.
@@ -146,26 +156,29 @@ My simulation underestimates OpenRocket's apogee by about 3% because of two simp
 
 ## Next steps
 
-- Parachute descent and landing speed
-- Sensitivity analysis on $C_d$ and mass
-- Altitude-dependent air density (ISA)
-- 2D trajectory with wind
+- Use OpenRocket's exported $C_d$ against speed instead of a constant
+- Uncertainty analysis on $C_d$, mass and motor impulse
 - Compare with real flight data from a logging altimeter
+- Parachute descent and landing speed
+- 2D trajectory with wind
 
 ---
 
 ## Running it
 
 ```bash
-pip install numpy scipy matplotlib
+pip install -r requirements.txt
 python rocket_sim.py
+python openrocket_effective_cd.py
 ```
 
 | File | Contents |
 |---|---|
 | `rocket_sim.py` | Simulation, solvers and plots |
 | `Estes_C6.csv` | Certified C6 thrust curve (thrustcurve.org) |
-| `openrocket_C6-7.csv` | OpenRocket export used for validation |
+| `openrocket_effective_cd.py` | Works out the drag coefficient OpenRocket was effectively using |
+| `openrocket_C6-7.csv` | OpenRocket export used for the comparison |
 | `validation_vs_openrocket.png` | Comparison plot |
+| `residuals_vs_openrocket.png` | Difference between this simulator and OpenRocket against time |
 | `derivation_notes.pdf` | Handwritten derivations |
 | `excel_verification.xlsx` | Hand verification: impulse, mass model, coast estimate and Excel Euler |

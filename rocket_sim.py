@@ -16,17 +16,18 @@ t_data = np.insert(t_data,0,0)
 T_data = np.insert(T_data,0,0)
 
 #Calculate the trapezium rule for the data
+#(np.trapezoid only exists in NumPy 2.0+, np.trapz is its older name)
 
-I_total = np.trapezoid(T_data,t_data)
+trapezium = getattr(np,"trapezoid",None) or np.trapz
+I_total = trapezium(T_data,t_data)
 t_burn = t_data[-1]
 
 #Constants
 
 g = 9.81
-rho = 1.225
+rho0 = 1.225
 Cd = 0.56
 A = np.pi * 0.0125**2
-k = 0.5 * rho * Cd * A
 m0 = 0.0571
 m_prop = 0.0108
 dt = 0.01
@@ -39,11 +40,20 @@ def thrust(t):
         return 0.0
     return np.interp(t,t_data, T_data)
 
+#Air density: constant sea-level value, or the International Standard
+#Atmosphere (ISA) troposphere formula if isa is True
+
+def density(h,isa):
+    if isa:
+        return rho0 * (1 - 2.25577e-5*max(h,0.0))**4.25588
+    return rho0
+
 #State model function
 
-def derivs(t,y):
+def derivs(t,y,isa=False):
     h,v,m = y
     T = thrust(t)
+    k = 0.5 * density(h,isa) * Cd * A
     a = (T - m*g - k*v*abs(v))/m
     if h<=0 and a< 0:
         a = 0
@@ -69,7 +79,7 @@ while t < 10:
 
 #rk45 implementation
 
-def apogee(t,y):
+def apogee(t,y,isa=False):
     if y[0] < 1.0:
         return 1.0
     return y[1]
@@ -79,6 +89,12 @@ sol = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
 events=apogee, max_step=0.01)
 euler_apogee = max(hs)
 rk_apogee = sol.y_events[0][0][0]
+
+#rk45 again with ISA air density, to see how much of the gap density explains
+
+sol_isa = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
+events=apogee, max_step=0.01, args=(True,))
+isa_apogee = sol_isa.y_events[0][0][0]
 
 #Reading from the open rocket csv
 
@@ -97,6 +113,14 @@ print("RK45 apogee:", rk_apogee)
 print("Euler apogee:",euler_apogee)
 print("RK45 time of apogee:", sol.t_events[0][0])
 print("Difference:", (euler_apogee - rk_apogee) / rk_apogee * 100, "%")
+print("RK45 apogee with ISA density:", isa_apogee)
+print("ISA vs OpenRocket:", (isa_apogee - or_apogee) / or_apogee * 100, "%")
+
+#State at burnout, my sim against OpenRocket
+
+i_b = np.argmin(abs(or_t - t_burn))
+print("Burnout height, sim vs OpenRocket:", np.interp(t_burn,sol.t,sol.y[0]), or_h[i_b])
+print("Burnout velocity, sim vs OpenRocket:", np.interp(t_burn,sol.t,sol.y[1]), or_v[i_b])
 
 
 #Plotting the data points
@@ -112,4 +136,20 @@ ax2.set_xlabel("Time (s)")
 ax2.legend()
 ax1.set_xlim(0, 8.5)
 plt.savefig("validation_vs_openrocket.png", dpi=200, bbox_inches="tight")
+
+#Residuals (my RK45 sim minus OpenRocket) up to my apogee.
+#The plot above hides these because the curves are so close together.
+mask = or_t <= sol.t[-1]
+res_h = np.interp(or_t[mask],sol.t,sol.y[0]) - or_h[mask]
+res_v = np.interp(or_t[mask],sol.t,sol.y[1]) - or_v[mask]
+fig2, (bx1, bx2) = plt.subplots(2, 1, sharex=True)
+bx1.plot(or_t[mask], res_h)
+bx1.axvline(t_burn, color="grey", linestyle=":", label="Burnout")
+bx1.set_ylabel("Altitude difference (m)")
+bx1.legend()
+bx2.plot(or_t[mask], res_v)
+bx2.axvline(t_burn, color="grey", linestyle=":")
+bx2.set_ylabel("Velocity difference (m/s)")
+bx2.set_xlabel("Time (s)")
+plt.savefig("residuals_vs_openrocket.png", dpi=200, bbox_inches="tight")
 plt.show()
