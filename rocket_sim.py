@@ -28,6 +28,7 @@ g = 9.81
 rho0 = 1.225
 Cd = 0.56
 A = np.pi * 0.0125**2
+A_or = np.pi * 0.0123952**2   #OpenRocket's reference area: its BT-50 body tube is 24.79 mm across
 m0 = 0.0571
 m_prop = 0.0108
 dt = 0.01
@@ -50,10 +51,10 @@ def density(h,isa):
 
 #State model function
 
-def derivs(t,y,isa=False):
+def derivs(t,y,isa=False,area=A):
     h,v,m = y
     T = thrust(t)
-    k = 0.5 * density(h,isa) * Cd * A
+    k = 0.5 * density(h,isa) * Cd * area
     a = (T - m*g - k*v*abs(v))/m
     if h<=0 and a< 0:
         a = 0
@@ -79,7 +80,7 @@ while t < 10:
 
 #rk45 implementation
 
-def apogee(t,y,isa=False):
+def apogee(t,y,isa=False,area=A):
     if y[0] < 1.0:
         return 1.0
     return y[1]
@@ -95,6 +96,15 @@ rk_apogee = sol.y_events[0][0][0]
 sol_isa = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
 events=apogee, max_step=0.01, args=(True,))
 isa_apogee = sol_isa.y_events[0][0][0]
+
+#rk45 with OpenRocket's body diameter, on its own and then with ISA density as well
+
+sol_area = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
+events=apogee, max_step=0.01, args=(False,A_or))
+area_apogee = sol_area.y_events[0][0][0]
+sol_both = solve_ivp(derivs, t_span=(0,10),y0 =[0.0,0.0,m0],
+events=apogee, max_step=0.01, args=(True,A_or))
+both_apogee = sol_both.y_events[0][0][0]
 
 #Reading from the open rocket csv
 
@@ -115,6 +125,10 @@ print("RK45 time of apogee:", sol.t_events[0][0])
 print("Difference:", (euler_apogee - rk_apogee) / rk_apogee * 100, "%")
 print("RK45 apogee with ISA density:", isa_apogee)
 print("ISA vs OpenRocket:", (isa_apogee - or_apogee) / or_apogee * 100, "%")
+print("RK45 apogee with OpenRocket's body diameter:", area_apogee)
+print("Diameter vs OpenRocket:", (area_apogee - or_apogee) / or_apogee * 100, "%")
+print("RK45 apogee with ISA density and OpenRocket's body diameter:", both_apogee)
+print("Both vs OpenRocket:", (both_apogee - or_apogee) / or_apogee * 100, "%")
 
 #State at burnout, my sim against OpenRocket
 

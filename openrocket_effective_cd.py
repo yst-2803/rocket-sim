@@ -5,12 +5,14 @@
 #so                             Cd = (T - m*g - m*a) / (0.5*rho*A*v^2)
 #
 #OpenRocket's acceleration a is found from the slope of its velocity data.
-#Assumes OpenRocket used the same masses and thrust curve as rocket_sim.py.
+#OpenRocket used the same masses and thrust curve as rocket_sim.py (see
+#AlphaIII_C6.ork). Its drag coefficient is defined on its own reference area,
+#the 24.79 mm BT-50 body tube, so that area is used here and not my 25 mm.
 
 import numpy as np
 
 g = 9.81
-A = np.pi * 0.0125**2
+A = np.pi * 0.0123952**2
 m0 = 0.0571
 m_prop = 0.0108
 

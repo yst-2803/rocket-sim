@@ -57,7 +57,7 @@ The full derivation is in my handwritten notes: [derivation_notes.pdf](derivatio
 | Launch mass $m_0$ | 57.1 g | 34 g rocket (Estes spec) + 23.1 g motor |
 | Propellant mass $m_{prop}$ | 10.8 g | OpenRocket motor database |
 | Dry mass (after burnout) | 46.3 g | 34 g rocket + 12.3 g empty casing |
-| Body diameter | 25 mm ($A = 4.91 \times 10^{-4}$ m²) | Estes spec |
+| Body diameter | 25 mm ($A = 4.91 \times 10^{-4}$ m²) | Estes spec (the OpenRocket design uses its 24.79 mm BT-50 tube) |
 | Drag coefficient $C_d$ | 0.56 | OpenRocket (rounded 1.5 mm fins) |
 | Air density $\rho$ | 1.225 kg/m³ | Sea level, held constant (an ISA run is included for comparison) |
 | Time step $\Delta t$ (Euler) | 0.01 s | — |
@@ -111,6 +111,7 @@ OpenRocket is another simulation, and my drag coefficient is taken from it, so t
 | **This simulator (RK45)** | **373.4 m** | **−3.1%** |
 | This simulator (Euler) | 373.1 m | −3.2% |
 | This simulator (RK45, ISA air density) | 376.8 m | −2.3% |
+| This simulator (RK45, ISA air density and OpenRocket's body diameter) | 380.2 m | −1.4% |
 | Analytical coast solution* | 378 m | −2.1% |
 | Estes (manufacturer) | 351 m | −9.0% |
 
@@ -128,8 +129,9 @@ OpenRocket is another simulation, and my drag coefficient is taken from it, so t
 My simulation underestimates OpenRocket's apogee by 3.1%. I first put this down to constant air density and a constant drag coefficient in the coast. Breaking the gap down shows that is only part of it:
 
 - **Air density explains about a quarter.** Switching to ISA density (1.225 kg/m³ on the pad, about 1.18 kg/m³ at apogee) raises the apogee from 373.4 m to 376.8 m, which closes 0.9 of the 3.1 percentage points.
+- **Body diameter explains about another quarter.** I used the nominal 25 mm. The BT-50 body tube in the OpenRocket design (`AlphaIII_C6.ork`) is 24.79 mm, a 1.7% smaller frontal area. Using that diameter as well gives 380.2 m, closing another 0.9 points.
+- **The rest is the drag coefficient changing with speed.** Working backwards from OpenRocket's own trajectory (`openrocket_effective_cd.py`) gives an effective $C_d$ between about 0.53 and 0.56 through the flight, against the constant 0.56 I used. With $C_d = 0.545$, ISA density and OpenRocket's diameter the apogee is 385.7 m (+0.1%). That value was picked after seeing the answer, so it shows where the gap comes from; it is not an independent prediction.
 - **The gap opens during the burn, not only in the coast.** At burnout my simulation is already 1.1 m/s slower and 0.8 m lower than OpenRocket, at heights where air density has barely changed. The altitude plot above hides this; the residual plot below shows it.
-- **Most of the rest is the drag coefficient.** Working backwards from OpenRocket's own trajectory (`openrocket_effective_cd.py`, assuming it used the same masses) gives an effective $C_d$ of about 0.52–0.55 through the flight, below the constant 0.56 I used. Re-running with $C_d = 0.53$ and ISA density gives 388.0 m (+0.7%). That value was picked after seeing the answer, so it shows where the gap comes from; it is not an independent prediction.
 
 ![Residuals vs OpenRocket](residuals_vs_openrocket.png)
 
@@ -178,6 +180,7 @@ python openrocket_effective_cd.py
 | `Estes_C6.csv` | Certified C6 thrust curve (thrustcurve.org) |
 | `openrocket_effective_cd.py` | Works out the drag coefficient OpenRocket was effectively using |
 | `openrocket_C6-7.csv` | OpenRocket export used for the comparison |
+| `AlphaIII_C6.ork` | OpenRocket design file the export came from |
 | `validation_vs_openrocket.png` | Comparison plot |
 | `residuals_vs_openrocket.png` | Difference between this simulator and OpenRocket against time |
 | `derivation_notes.pdf` | Handwritten derivations |
