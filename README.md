@@ -166,6 +166,10 @@ My simulation underestimates OpenRocket's apogee by 3.1%. I first put this down 
 
 ---
 
+## Use of AI
+
+The derivations and the maths are my own and are in `derivation_notes.pdf`. I had AI help with Python syntax and with structuring the script. The breakdown of the gap to OpenRocket (air density, body diameter and effective drag coefficient) and the corrections to this README were done with an AI assistant; they are in the commit history.
+
 ## Running it
 
 ```bash
