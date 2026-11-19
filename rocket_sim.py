@@ -25,7 +25,13 @@ t_burn = t_data[-1]
 g = 9.81
 rho0 = 1.225
 Cd = 0.56
-A = np.pi * 0.0125**2
+use_isa = False  #----- switch to allow excel assumed conditions or variable
+use_or_diameter = False
+if use_or_diameter:
+    A = np.pi * (0.024790/2)**2
+else:
+    A = np.pi * 0.0125**2
+    #----- switch end------#
 m0 = 0.0571
 m_prop = 0.0108
 dt = 0.01
@@ -43,7 +49,7 @@ def thrust(t):
     return np.interp(t,t_data, T_data)
 
 #New - modified density function
-use_isa = True #if false then matches excel verification
+
 def air_density(h):
     if not use_isa:
         return rho0
@@ -102,7 +108,7 @@ or_v = or_data[:,2]
 or_apogee = max(or_h)
 
 #Prints and error
-
+print(f"Options: use_isa = {use_isa}, use or_diameter = {use_or_diameter}")
 print("OpenRocket apogee:", or_apogee)
 print("RK45 vs OpenRocket:", (rk_apogee - or_apogee) / or_apogee * 100, "%")
 print("Euler vs OpenRocket:", (euler_apogee - or_apogee) / or_apogee * 100, "%")
