@@ -23,13 +23,16 @@ t_burn = t_data[-1]
 #Constants
 
 g = 9.81
-rho = 1.225
+rho0 = 1.225
 Cd = 0.56
 A = np.pi * 0.0125**2
-k = 0.5 * rho * Cd * A
 m0 = 0.0571
 m_prop = 0.0108
 dt = 0.01
+T0 = 288.15
+L = 0.0065
+R_air = 287.05
+
 
 #T(t)
 
@@ -39,10 +42,20 @@ def thrust(t):
         return 0.0
     return np.interp(t,t_data, T_data)
 
+#New - modified density function
+use_isa = True #if false then matches excel verification
+def air_density(h):
+    if not use_isa:
+        return rho0
+    T = T0 - L*h
+    return rho0 * (T/T0)**(g/(R_air*L)-1)
+
 #State model function
 
 def derivs(t,y):
     h,v,m = y
+    rho = air_density(h)
+    k = 0.5 * rho * Cd * A
     T = thrust(t)
     a = (T - m*g - k*v*abs(v))/m
     if h<=0 and a< 0:
