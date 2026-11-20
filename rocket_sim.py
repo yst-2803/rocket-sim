@@ -1,3 +1,5 @@
+from email.quoprimime import body_length
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
@@ -25,12 +27,15 @@ t_burn = t_data[-1]
 g = 9.81
 rho0 = 1.225
 Cd = 0.56
-use_isa = False  #----- switch to allow excel assumed conditions or variable
+#Model options (both false - baseline model matches excel verification)
+use_isa = False
 use_or_diameter = False
+use_drag_model = True
 if use_or_diameter:
     A = np.pi * (0.024790/2)**2
 else:
     A = np.pi * 0.0125**2
+
     #----- switch end------#
 m0 = 0.0571
 m_prop = 0.0108
@@ -38,7 +43,14 @@ dt = 0.01
 T0 = 288.15
 L = 0.0065
 R_air = 287.05
-
+mu = 1.789e-5 #dynamic viscosity of air
+L_body = 0.3072 #body length
+l_fin = 0.0375 #mean fin chord
+eps = 60e-6 #surface roughness, m (OR paint)
+A_wet_body = 21004e-6 #sa cone and tube
+A_wet_fins = 9000e-6 #3 fins and 2 faces on each fin
+A_fin_base = 180e-6 #3 trailing edges combined
+Re_crit = 5*10**5
 
 #T(t)
 
@@ -56,13 +68,42 @@ def air_density(h):
     T = T0 - L*h
     return rho0 * (T/T0)**(g/(R_air*L)-1)
 
+#New - Cf calculation
+
+def skin_friction_cf(Re):
+    Re = max(Re,1e4) #fix div/0 error initially on launch pad
+    if Re < Re_crit:
+        cf_smooth = 1.328 / np.sqrt(Re) #blasius
+    else:
+        cf_smooth = 0.074/ (Re)**0.2 - 1743/Re #prandtls with the laminar correction
+    cf_rough =  0.032*(eps/L_body)**0.2
+    return max(cf_smooth,cf_rough)
+
+
+def drag_coefficient(v,h,motor_on):
+    rho = air_density(h)
+    nu = mu/rho
+    Re_body = (abs(v)*L_body)/nu
+    Re_fin = (abs(v)*l_fin)/nu
+    C_fbody = skin_friction_cf(Re_body)
+    C_ffin = skin_friction_cf(Re_fin)
+    friction_body = 1.15 * C_fbody * (A_wet_body/A)
+    friction_fins = C_ffin * (A_wet_fins/A)
+    base_drag = 0.11
+    fin_edges = 0.055 * (A_fin_base/A)
+    return (friction_body+friction_fins+base_drag+fin_edges)
+
 #State model function
 
 def derivs(t,y):
     h,v,m = y
     rho = air_density(h)
-    k = 0.5 * rho * Cd * A
     T = thrust(t)
+    if use_drag_model:
+        Cd_now = drag_coefficient(v,h,T>0)
+    else:
+        Cd_now = Cd
+    k = 0.5 * rho * Cd_now * A
     a = (T - m*g - k*v*abs(v))/m
     if h<=0 and a< 0:
         a = 0
