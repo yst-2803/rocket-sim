@@ -267,6 +267,7 @@ At matching roughness, my drag build-up sits between the two programs: about 0.0
 - **Constant exhaust velocity** assumed in the mass model.
 - **No parachute:** after apogee the sim falls ballistically, so only the ascent is compared.
 - **Simulation-to-simulation only:** proper validation needs flight data.
+- **Fin roughness length:** the rough-wall friction formula uses the rocket’s length for the fins as well as the body, following OpenRocket. Using the fin chord instead (closer to flat-plate theory) raises $C_d$ to 0.59 and lowers the apogee to 371 m (−3.7%).
 
 ---
 
