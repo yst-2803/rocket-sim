@@ -1,4 +1,3 @@
-from email.quoprimime import body_length
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,9 +26,9 @@ t_burn = t_data[-1]
 g = 9.81
 rho0 = 1.225
 Cd = 0.56
-#Model options (both false - baseline model matches excel verification)
-use_isa = False
-use_or_diameter = False
+#Model options (all false - baseline model matches excel verification)
+use_isa = True
+use_or_diameter = True
 use_drag_model = True
 if use_or_diameter:
     A = np.pi * (0.024790/2)**2
@@ -149,7 +148,7 @@ or_v = or_data[:,2]
 or_apogee = max(or_h)
 
 #Prints and error
-print(f"Options: use_isa = {use_isa}, use or_diameter = {use_or_diameter}")
+print(f"Options: use_isa = {use_isa}, use or_diameter = {use_or_diameter}, use drag_model = {use_drag_model}")
 print("OpenRocket apogee:", or_apogee)
 print("RK45 vs OpenRocket:", (rk_apogee - or_apogee) / or_apogee * 100, "%")
 print("Euler vs OpenRocket:", (euler_apogee - or_apogee) / or_apogee * 100, "%")
@@ -173,3 +172,34 @@ ax2.legend()
 ax1.set_xlim(0, 8.5)
 plt.savefig("validation_vs_openrocket.png", dpi=200, bbox_inches="tight")
 plt.show()
+
+# --- RASAero II comparison ---
+# Like-for-like run: all switches True, eps = 30.5e-6, m0 = 0.0590 (RASAero's 0.13 lb)
+compare_rasaero = False
+
+if compare_rasaero:
+    ras = np.genfromtxt("rasaero_flight_013lb.csv", delimiter=",", skip_header=1)
+    ras_t = ras[:,0]
+    ras_cd = ras[:,5]
+    ras_v = ras[:,18] * 0.3048   # ft/s -> m/s
+    ras_h = ras[:,22] * 0.3048   # ft -> m
+    sim_cd = [drag_coefficient(v, h, False) for v, h in zip(vs, hs)]
+
+    fig3, (a1, a2, a3) = plt.subplots(3, 1, figsize=(8, 9), sharex=True)
+    a1.plot(ts, hs, label="My sim (Euler)")
+    a1.plot(ras_t, ras_h, "--", label="RASAero II")
+    a1.set_ylabel("Altitude (m)")
+    a2.plot(ts, vs, label="My sim (Euler)")
+    a2.plot(ras_t, ras_v, "--", label="RASAero II")
+    a2.set_ylabel("Velocity (m/s)")
+    a2.set_ylabel("Velocity (m/s)")
+    a2.set_ylim(-10, 130)
+    a3.plot(ts[1:], sim_cd[1:], label="My sim")
+    a3.plot(ras_t[1:], ras_cd[1:], "--", label="RASAero II")
+    a3.set_ylabel("Drag coefficient")
+    a3.set_xlabel("Time (s)")
+    a3.set_xlim(0, 9)
+    for ax in (a1, a2, a3):
+        ax.legend()
+    fig3.savefig("validation_vs_rasaero.png", dpi=200, bbox_inches="tight")
+    plt.show()
